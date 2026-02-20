@@ -1,13 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
-  base: '/Institute_Management_System/',
+  base: '/',   // ✅ FIXED
   plugins: [react()],
-  server: {
-    host: 'localhost',
-    port: 5173,
-    strictPort: true,
-  }
 })
