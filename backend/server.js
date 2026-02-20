@@ -193,6 +193,45 @@ const TABLES = {
       timestamp  DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+    acportal_attendance: `
+    CREATE TABLE IF NOT EXISTS acportal_attendance (
+      id          VARCHAR(100) PRIMARY KEY,
+      date        VARCHAR(20),
+      courseId    VARCHAR(100),
+      studentId   VARCHAR(100),
+      status      VARCHAR(20),
+      takenBy     VARCHAR(100),
+      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+    acportal_timetable: `
+    CREATE TABLE IF NOT EXISTS acportal_timetable (
+      id          VARCHAR(100) PRIMARY KEY,
+      dayOfWeek   VARCHAR(20),
+      startTime   VARCHAR(20),
+      endTime     VARCHAR(20),
+      courseId    VARCHAR(100),
+      room        VARCHAR(100),
+      teacherId   VARCHAR(100),
+      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+    acportal_results: `
+    CREATE TABLE IF NOT EXISTS acportal_results (
+      id              VARCHAR(100) PRIMARY KEY,
+      assessmentName  VARCHAR(255),
+      courseId        VARCHAR(100),
+      program         VARCHAR(255),
+      studentGroup    VARCHAR(100),
+      studentId       VARCHAR(100),
+      theoryScore     VARCHAR(20),
+      vivaScore       VARCHAR(20),
+      comments        TEXT,
+      totalScore      VARCHAR(20),
+      grade           VARCHAR(10),
+      created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 };
 
 // ─── Table → column mapping for INSERT/SELECT ────────────────────────────────

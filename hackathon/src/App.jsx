@@ -12,6 +12,9 @@ import QuizPage from './pages/QuizPage';
 import ChatPage from './pages/ChatPage';
 import AdminPage from './pages/AdminPage';
 import CalendarPage from './pages/CalendarPage';
+import TimetablePage from './pages/TimetablePage';
+import AttendancePage from './pages/AttendancePage';
+import ResultsPage from './pages/ResultsPage';
 import Sidebar from './components/Sidebar';
 import AnimatedBackground from './components/AnimatedBackground';
 import ChatBot from './components/ChatBot';
@@ -39,6 +42,9 @@ function AppInner() {
     chat: 'Messages',
     admin: 'Admin Panel',
     calendar: 'Exam Calendar',
+    timetable: 'Class Timetable',
+    attendance: 'Daily Attendance',
+    results: 'Assessment Results',
   };
 
   return (
@@ -71,6 +77,9 @@ function AppInner() {
         {page === 'admin' && isAdmin && <AdminPage />}
         {page === 'admin' && !isAdmin && <DashboardPage setPage={setPage} />}
         {page === 'calendar' && <CalendarPage />}
+        {page === 'timetable' && <TimetablePage />}
+        {page === 'attendance' && <AttendancePage />}
+        {page === 'results' && <ResultsPage />}
       </main>
 
       {/* Floating chatbot — visible only for students */}

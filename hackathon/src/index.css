@@ -1447,7 +1447,7 @@ a:hover {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(10, 10, 20, 0.6);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
@@ -1458,7 +1458,9 @@ a:hover {
 }
 
 .modal {
-  background: rgba(10, 10, 25, 0.98);
+  background: var(--bg-surface);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
   padding: 36px;
@@ -1467,7 +1469,7 @@ a:hover {
   max-height: 92vh;
   overflow-y: auto;
   animation: slide-up 0.35s var(--t-spring);
-  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(124, 58, 237, 0.2);
+  box-shadow: var(--shadow-xl), 0 0 0 1px rgba(124, 58, 237, 0.2);
   position: relative;
 }
 

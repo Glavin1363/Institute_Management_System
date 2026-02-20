@@ -14,6 +14,8 @@ export default function Sidebar({ currentPage, setPage }) {
             label: 'Main',
             items: [
                 { key: 'dashboard', label: 'Dashboard', icon: '🏠' },
+                { key: 'timetable', label: 'Timetable', icon: '🕒' },
+                { key: 'attendance', label: 'Attendance', icon: '✅' },
                 { key: 'notices', label: 'Circulars', icon: '📢' },
                 { key: 'calendar', label: 'Exam Calendar', icon: '📅' },
                 { key: 'repository', label: 'Repository', icon: '📚' },
@@ -25,6 +27,7 @@ export default function Sidebar({ currentPage, setPage }) {
             label: 'Learning',
             items: [
                 { key: 'quiz', label: user.role === 'student' ? 'Join Quiz' : 'Quiz Rooms', icon: '🎯' },
+                { key: 'results', label: 'Results Tool', icon: '📈' },
             ],
         },
         ...(isStaff ? [{

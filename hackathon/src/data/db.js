@@ -18,6 +18,9 @@ const SYNC_KEYS = new Set([
   'acportal_chat_messages',
   'acportal_audit_logs',
   'acportal_exam_events',
+  'acportal_attendance',
+  'acportal_timetable',
+  'acportal_results',
 ]);
 
 let syncEnabled = false; // enabled after dbInit completes
@@ -104,6 +107,9 @@ const DB_KEYS = {
   CHAT_MESSAGES: 'acportal_chat_messages',
   AUDIT_LOGS: 'acportal_audit_logs',
   EXAM_EVENTS: 'acportal_exam_events',
+  ATTENDANCE: 'acportal_attendance',
+  TIMETABLE: 'acportal_timetable',
+  RESULTS: 'acportal_results',
 };
 
 // ---- AUDIT LOG ----
@@ -186,6 +192,9 @@ const seedData = () => {
   if (!localStorage.getItem(DB_KEYS.CHAT_MESSAGES)) localStorage.setItem(DB_KEYS.CHAT_MESSAGES, JSON.stringify([]));
   if (!localStorage.getItem(DB_KEYS.AUDIT_LOGS)) localStorage.setItem(DB_KEYS.AUDIT_LOGS, JSON.stringify([]));
   if (!localStorage.getItem(DB_KEYS.EXAM_EVENTS)) localStorage.setItem(DB_KEYS.EXAM_EVENTS, JSON.stringify([]));
+  if (!localStorage.getItem(DB_KEYS.ATTENDANCE)) localStorage.setItem(DB_KEYS.ATTENDANCE, JSON.stringify([]));
+  if (!localStorage.getItem(DB_KEYS.TIMETABLE)) localStorage.setItem(DB_KEYS.TIMETABLE, JSON.stringify([]));
+  if (!localStorage.getItem(DB_KEYS.RESULTS)) localStorage.setItem(DB_KEYS.RESULTS, JSON.stringify([]));
 };
 
 // ---- AUTH ----
@@ -774,6 +783,73 @@ export const dbChangePassword = (userId, newPassword, adminUser) => {
   localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
   dbLog('CHANGE_PASSWORD', adminUser, `Changed password for user: ${users[idx].name} (${users[idx].role})`);
   return { success: true };
+};
+
+// ---- ATTENDANCE ----
+export const dbGetAttendance = (filters = {}) => {
+  let records = JSON.parse(localStorage.getItem(DB_KEYS.ATTENDANCE) || '[]');
+  if (filters.date) records = records.filter(r => r.date === filters.date);
+  if (filters.courseId) records = records.filter(r => r.courseId === filters.courseId);
+  if (filters.studentId) records = records.filter(r => r.studentId === filters.studentId);
+  return records;
+};
+
+export const dbSaveAttendance = (records, user) => {
+  const all = JSON.parse(localStorage.getItem(DB_KEYS.ATTENDANCE) || '[]');
+  records.forEach(r => {
+    const existingIdx = all.findIndex(a => a.date === r.date && a.courseId === r.courseId && a.studentId === r.studentId);
+    if (existingIdx >= 0) {
+      all[existingIdx].status = r.status;
+      all[existingIdx].takenBy = user.id;
+    } else {
+      all.push({
+        id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        date: r.date,
+        courseId: r.courseId,
+        studentId: r.studentId,
+        status: r.status,
+        takenBy: user.id,
+        createdAt: new Date().toISOString()
+      });
+    }
+  });
+  localStorage.setItem(DB_KEYS.ATTENDANCE, JSON.stringify(all));
+  dbLog('TAKE_ATTENDANCE', user, `Recorded attendance for ${records.length} students`);
+};
+
+// ---- TIMETABLE ----
+export const dbGetTimetable = (filters = {}) => {
+  let records = JSON.parse(localStorage.getItem(DB_KEYS.TIMETABLE) || '[]');
+  if (filters.teacherId) records = records.filter(r => r.teacherId === filters.teacherId);
+  return records;
+};
+
+// ---- RESULTS ----
+export const dbGetResults = (filters = {}) => {
+  let records = JSON.parse(localStorage.getItem(DB_KEYS.RESULTS) || '[]');
+  if (filters.courseId) records = records.filter(r => r.courseId === filters.courseId);
+  if (filters.studentId) records = records.filter(r => r.studentId === filters.studentId);
+  return records;
+};
+
+export const dbSaveResults = (resultsObj, user) => {
+  const all = JSON.parse(localStorage.getItem(DB_KEYS.RESULTS) || '[]');
+  const newResults = Array.isArray(resultsObj) ? resultsObj : [resultsObj];
+
+  newResults.forEach(r => {
+    const idx = all.findIndex(a => a.assessmentName === r.assessmentName && a.courseId === r.courseId && a.studentId === r.studentId);
+    if (idx >= 0) {
+      all[idx] = { ...all[idx], ...r };
+    } else {
+      all.push({
+        id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        ...r,
+        createdAt: new Date().toISOString()
+      });
+    }
+  });
+  localStorage.setItem(DB_KEYS.RESULTS, JSON.stringify(all));
+  dbLog('SAVE_RESULTS', user, `Saved ${newResults.length} result(s)`);
 };
 
 // NOTE: migrateData() and seedData() are now called inside dbInit()
