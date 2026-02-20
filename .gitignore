@@ -1,0 +1,12 @@
+node_modules/
+.env
+dist/
+.DS_Store
+*.migrated
+acportal-db.json*
+/hackathon/node_modules/
+/hackathon/dist/
+/hackathon/.env
+/backend/node_modules/
+/backend/.env
+/backend/acportal-db.json*
