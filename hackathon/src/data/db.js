@@ -689,12 +689,23 @@ export const dbSendMessage = (toUserId, text, sender) => {
 
 export const dbGetChatContacts = (user) => {
   const users = dbGetAllUsers();
+  let contacts = [];
   if (user.role === 'student') {
     // Students can only chat with faculty and admin
-    return users.filter(u => (u.role === 'faculty' || u.role === 'admin') && u.id !== user.id);
+    contacts = users.filter(u => (u.role === 'faculty' || u.role === 'admin') && u.id !== user.id);
+  } else {
+    // Faculty and admin can chat with everyone except themselves
+    contacts = users.filter(u => u.id !== user.id);
   }
-  // Faculty and admin can chat with everyone except themselves
-  return users.filter(u => u.id !== user.id);
+
+  const allMsgs = JSON.parse(localStorage.getItem(DB_KEYS.CHAT_MESSAGES) || '[]');
+  contacts.forEach(c => {
+    const key = dbGetConversationKey(user.id, c.id);
+    const msgs = allMsgs.filter(m => m.key === key);
+    c.lastMsgTs = msgs.length > 0 ? new Date(msgs[msgs.length - 1].timestamp).getTime() : 0;
+  });
+
+  return contacts.sort((a, b) => b.lastMsgTs - a.lastMsgTs);
 };
 
 export const dbGetUnreadCount = (userId, fromUserId) => {
@@ -713,7 +724,12 @@ export const dbMarkMessagesRead = (userId, fromUserId) => {
 
 export const dbGetTotalUnread = (userId) => {
   const all = JSON.parse(localStorage.getItem(DB_KEYS.CHAT_MESSAGES) || '[]');
-  return all.filter(m => m.receiverId === userId && !m.read).length;
+  const currentUser = JSON.parse(localStorage.getItem(DB_KEYS.CURRENT_USER) || 'null');
+  if (!currentUser) return 0;
+
+  // Only count unread messages from valid contacts (prevents ghost messages from deleted users)
+  const validContacts = dbGetChatContacts(currentUser).map(c => c.id);
+  return all.filter(m => m.receiverId === userId && validContacts.includes(m.senderId) && !m.read).length;
 };
 
 // ---- EXAM EVENTS ----
