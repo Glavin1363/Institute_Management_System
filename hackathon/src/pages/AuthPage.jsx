@@ -118,7 +118,7 @@ export default function AuthPage() {
                                 {(['student', 'faculty', 'admin']).map(r => (
                                     <button key={r} type="button"
                                         className={`role-tab ${role === r ? 'active' : ''}`}
-                                        onClick={() => { setRole(r); setError(''); }}>
+                                        onClick={() => { setRole(r); setError(''); setEmail(''); setPassword(''); }}>
                                         {roleLabels[r]}
                                     </button>
                                 ))}
@@ -131,8 +131,8 @@ export default function AuthPage() {
                             <label className="form-label">Email Address</label>
                             <div className="input-with-icon">
                                 <span className="inp-icon">✉️</span>
-                                <input className="form-input" type="email" placeholder="you@dept.edu"
-                                    value={email} onChange={e => setEmail(e.target.value)} required />
+                                <input key={`email-${role}`} className="form-input" type="email" placeholder="you@dept.edu"
+                                    value={email} onChange={e => setEmail(e.target.value)} required autoComplete="off" />
                             </div>
                         </div>
 
@@ -140,8 +140,8 @@ export default function AuthPage() {
                             <label className="form-label">Password</label>
                             <div className="input-with-icon">
                                 <span className="inp-icon">🔒</span>
-                                <input className="form-input" type="password" placeholder="••••••••"
-                                    value={password} onChange={e => setPassword(e.target.value)} required />
+                                <input key={`pwd-${role}`} className="form-input" type="password" placeholder="••••••••"
+                                    value={password} onChange={e => setPassword(e.target.value)} required autoComplete="new-password" />
                             </div>
                         </div>
 
