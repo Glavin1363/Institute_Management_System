@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbGetFiles, dbGetTotalUnread } from '../data/db';
+import srinivasLogo from '../assets/srinivas.jpg';
 
 export default function Sidebar({ currentPage, setPage }) {
     const { user, logout } = useAuth();
@@ -42,7 +43,7 @@ export default function Sidebar({ currentPage, setPage }) {
         <aside className="sidebar">
             {/* Logo */}
             <div className="sidebar-logo">
-                <img src="/logo.png" alt="Srinivas University" className="logo-img" />
+                <img src={srinivasLogo} alt="Srinivas University" className="logo-img" />
                 <div>
                     <div className="logo-text-main">Srinivas University</div>
                     <div className="logo-text-sub">Department Portal</div>

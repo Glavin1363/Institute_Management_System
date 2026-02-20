@@ -4,6 +4,7 @@ import { jwtDecode } from 'jwt-decode';
 import { dbLogin, dbRegisterStudent, dbGoogleAuth } from '../data/db';
 import { useAuth } from '../context/AuthContext';
 import AnimatedBackground from '../components/AnimatedBackground';
+import srinivasLogo from '../assets/srinivas.jpg';
 
 export default function AuthPage() {
     const { setUser } = useAuth();
@@ -104,7 +105,7 @@ export default function AuthPage() {
 
             <div className="auth-card">
                 <div className="auth-hdr-text">
-                    <img src="/logo.png" alt="Srinivas University" style={{ width: 64, height: 64, objectFit: 'contain', marginBottom: 8 }} />
+                    <img src={srinivasLogo} alt="Srinivas University" style={{ width: 64, height: 64, objectFit: 'contain', marginBottom: 8 }} />
                     <h2 className="gradient-text">Srinivas University</h2>
                     <p>Department Digital Library &amp; Notice Board</p>
                 </div>
