@@ -22,6 +22,8 @@ export default function AuthPage() {
     const [rName, setRName] = useState('');
     const [rEmail, setREmail] = useState('');
     const [rSem, setRSem] = useState('4');
+    const [rProgram, setRProgram] = useState('BCA');
+    const [rSection, setRSection] = useState('A');
     const [rPwd, setRPwd] = useState('');
     const [rConf, setRConf] = useState('');
 
@@ -45,7 +47,7 @@ export default function AuthPage() {
         if (rPwd.length < 6) { setError('Password must be at least 6 characters.'); return; }
         setLoading(true);
         await new Promise(r => setTimeout(r, 700));
-        const res = dbRegisterStudent(rUsn, rName, rSem, rPwd, rEmail);
+        const res = dbRegisterStudent(rUsn, rName, rSem, rProgram, rSection, rPwd, rEmail);
         if (res.success) setUser(res.user);
         else setError(res.error);
         setLoading(false);
@@ -184,11 +186,23 @@ export default function AuthPage() {
                                     value={rEmail} onChange={e => setREmail(e.target.value)} required />
                             </div>
                         </div>
-                        <div className="form-group">
-                            <label className="form-label">Semester</label>
-                            <select className="form-select" value={rSem} onChange={e => setRSem(e.target.value)}>
-                                {[1, 2, 3, 4, 5, 6].map(s => <option key={s} value={s}>{s}{['st', 'nd', 'rd', 'th', 'th', 'th'][s - 1]} Semester</option>)}
-                            </select>
+                        <div className="g-2" style={{ gap: 12 }}>
+                            <div className="form-group">
+                                <label className="form-label">Program</label>
+                                <select className="form-select" value={rProgram} onChange={e => setRProgram(e.target.value)}>
+                                    <option value="BCA">BCA</option>
+                                    <option value="BBA">BBA</option>
+                                    <option value="B.COM">B.COM</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Section</label>
+                                <select className="form-select" value={rSection} onChange={e => setRSection(e.target.value)}>
+                                    <option value="A">Section A</option>
+                                    <option value="B">Section B</option>
+                                    <option value="C">Section C</option>
+                                </select>
+                            </div>
                         </div>
                         <div className="g-2" style={{ gap: 12 }}>
                             <div className="form-group">

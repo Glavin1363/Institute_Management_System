@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { saveAs } from 'file-saver';
-import { dbGetFiles, dbUploadFile } from '../data/db';
+import { dbGetFiles, dbUploadFile, dbDeleteFile } from '../data/db';
 import { useAuth } from '../context/AuthContext';
 import { fileEmoji } from './DashboardPage';
 
@@ -62,12 +62,26 @@ function PreviewModal({ file, onClose }) {
                 </div>
                 {hasData && (
                     <div style={{ padding: '12px 24px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
-                        <a className="btn btn-primary btn-sm"
-                            href={file.url}
-                            download={`${file.name.replace(/[^a-zA-Z0-9._\-]/g, '_')}.${file.type}`}
-                            style={{ textDecoration: 'none' }}>
+                        <button className="btn btn-primary btn-sm"
+                            onClick={() => {
+                                try {
+                                    const [header, b64] = file.url.split(',');
+                                    const mime = header.match(/:(.*?);/)[1];
+                                    const binary = atob(b64);
+                                    const bytes = new Uint8Array(binary.length);
+                                    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                                    const blob = new Blob([bytes], { type: mime });
+                                    const ext = file.type || 'bin';
+                                    const filename = `${file.name.replace(/[^a-zA-Z0-9._\- ]/g, '_')}.${ext}`;
+                                    saveAs(blob, filename);
+                                } catch (e) {
+                                    console.error('Download failed', e);
+                                    alert('Failed to download from preview.');
+                                }
+                            }}
+                            style={{ cursor: 'pointer' }}>
                             ⬇ Download
-                        </a>
+                        </button>
                     </div>
                 )}
             </div>
@@ -75,18 +89,14 @@ function PreviewModal({ file, onClose }) {
     );
 }
 
-function ResourceCard({ file }) {
+function ResourceCard({ file, user, onUpdate }) {
     const [showPreview, setShowPreview] = useState(false);
-    const [blobUrl, setBlobUrl] = useState(null);
 
     const ext = file.type === 'url' ? 'txt' : (file.type || 'bin');
     const filename = `${file.name.replace(/[^a-zA-Z0-9._\- ]/g, '_')}.${ext}`;
     const hasRealFile = file.url && file.url.startsWith('data:');
 
-    // Convert data URL → Blob → blob:// URL once on mount
-    // Rendering an <a href={blobUrl} download={filename}> is the ONLY method
-    // Chrome reliably uses the `download` attribute for. No programmatic clicks needed.
-    React.useEffect(() => {
+    const downloadFile = () => {
         if (!hasRealFile) return;
         try {
             const [header, b64] = file.url.split(',');
@@ -95,13 +105,22 @@ function ResourceCard({ file }) {
             const bytes = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
             const blob = new Blob([bytes], { type: mime });
-            const url = URL.createObjectURL(blob);
-            setBlobUrl(url);
-            return () => URL.revokeObjectURL(url);
+            saveAs(blob, filename);
         } catch (e) {
-            console.error('Blob creation failed:', e);
+            console.error('Download failed:', e);
+            alert('Failed to process file for download.');
         }
-    }, [file.url]);
+    };
+
+    const handleDelete = () => {
+        if (window.confirm(`Are you sure you want to delete "${file.name}"?`)) {
+            dbDeleteFile(file.id, user);
+            onUpdate('Resource deleted successfully.');
+        }
+    };
+
+    // Check if the current user is allowed to delete this (admin, faculty, or uploader)
+    const canDelete = user.role === 'admin' || user.role === 'faculty' || user.id === file.uploaderId;
 
     return (
         <>
@@ -132,26 +151,30 @@ function ResourceCard({ file }) {
                 </div>
 
                 <div className="res-actions">
-                    {blobUrl ? (
-                        // Rendered <a> with blob:// href — Chrome ALWAYS uses `download` attr for this case
-                        <a
+                    {hasRealFile ? (
+                        <button
                             className="btn btn-primary btn-sm"
-                            href={blobUrl}
-                            download={filename}
+                            onClick={downloadFile}
                             style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}
                         >
                             ⬇ Download
-                        </a>
+                        </button>
                     ) : (
                         <button className="btn btn-primary btn-sm"
-                            style={{ flex: 1, opacity: hasRealFile ? 0.7 : 0.45, cursor: 'not-allowed' }} disabled>
-                            {hasRealFile ? '⏳ Preparing…' : '⬇ No File'}
+                            style={{ flex: 1, opacity: 0.45, cursor: 'not-allowed' }} disabled>
+                            ⬇ No File
                         </button>
                     )}
                     <button className="btn btn-ghost btn-sm btn-icon" title="Preview"
                         onClick={() => setShowPreview(true)}>
                         👁
                     </button>
+                    {canDelete && (
+                        <button className="btn btn-ghost btn-sm btn-icon" title="Delete"
+                            onClick={handleDelete} style={{ color: '#EF4444' }}>
+                            🗑️
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -400,7 +423,7 @@ export default function RepositoryPage() {
                     </div>
                 ) : (
                     <div className="resource-grid">
-                        {files.map(f => <ResourceCard key={f.id} file={f} />)}
+                        {files.map(f => <ResourceCard key={f.id} file={f} user={user} onUpdate={(msg) => { rerender(n => n + 1); if (msg) showToast(msg); }} />)}
                     </div>
                 )}
             </div>

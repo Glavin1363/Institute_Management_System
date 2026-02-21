@@ -1,13 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dbGetFiles, dbGetTotalUnread } from '../data/db';
+import { dbGetFiles, dbGetTotalUnread, dbUpdateUser } from '../data/db';
 import srinivasLogo from '../assets/srinivas.jpg';
 
 export default function Sidebar({ currentPage, setPage }) {
-    const { user, logout } = useAuth();
+    const { user, logout, setUser } = useAuth();
     const pendingCount = dbGetFiles({ status: 'pending' }).length;
     const unreadCount = dbGetTotalUnread(user.id);
     const isStaff = user.role === 'admin' || user.role === 'faculty';
+
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [previewObj, setPreviewObj] = useState(user.avatar);
+    const [uploading, setUploading] = useState(false);
+
+    const handleAvatarChange = (e) => {
+        const fn = e.target.files[0];
+        if (!fn) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            setPreviewObj(ev.target.result);
+        };
+        reader.readAsDataURL(fn);
+    };
+
+    const handleSaveProfile = async () => {
+        if (!previewObj) return;
+        setUploading(true);
+        await new Promise(r => setTimeout(r, 600));
+        const res = dbUpdateUser(user.id, { avatar: previewObj });
+        if (res.success) {
+            setUser(res.user);
+            setShowProfileModal(false);
+        }
+        setUploading(false);
+    };
 
     const navGroups = [
         {
@@ -72,14 +98,79 @@ export default function Sidebar({ currentPage, setPage }) {
             </nav>
 
             {/* User footer */}
-            <div className="sidebar-footer">
-                <div className="user-ava">{user.avatar || user.name[0]}</div>
+            <div className="sidebar-footer" style={{ cursor: 'pointer' }} onClick={(e) => {
+                if (!e.target.closest('.logout-btn')) setShowProfileModal(true);
+            }}>
+                <div className="user-ava" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {user.avatar && user.avatar.length > 5 ? (
+                        <img src={user.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                        user.avatar || user.name[0]
+                    )}
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="user-nm">{user.name}</div>
                     <div className="user-rl">{user.role === 'admin' ? 'HOD / Admin' : user.role}</div>
                 </div>
                 <button className="logout-btn" onClick={() => logout(user)} title="Logout">↩</button>
             </div>
+
+            {/* Profile Modal */}
+            {showProfileModal && (
+                <div className="modal-overlay" onClick={() => setShowProfileModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+                        <div className="modal-hdr">
+                            <div className="modal-title">👤 Profile Settings</div>
+                            <button className="modal-close" onClick={() => setShowProfileModal(false)}>✕</button>
+                        </div>
+                        <div className="form-stack">
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+                                <div style={{
+                                    width: 120, height: 120, borderRadius: '50%', background: 'var(--bg-layer-2)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem',
+                                    color: 'var(--text-1)', overflow: 'hidden', border: '2px solid var(--primary)'
+                                }}>
+                                    {previewObj && previewObj.length > 5 ? (
+                                        <img src={previewObj} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                        user.avatar || user.name[0]
+                                    )}
+                                </div>
+
+                                <label className="btn btn-sm btn-outline" style={{ cursor: 'pointer' }}>
+                                    🖼️ Choose Picture
+                                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+                                </label>
+                            </div>
+
+                            <div className="form-group" style={{ marginTop: 16 }}>
+                                <label className="form-label">Full Name</label>
+                                <input className="form-input" value={user.name} disabled />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Email Address</label>
+                                <input className="form-input" value={user.email} disabled />
+                            </div>
+                            {user.role === 'student' && (
+                                <div className="g-2" style={{ gap: 12 }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Program</label>
+                                        <input className="form-input" value={user.program || 'BCA'} disabled />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Section</label>
+                                        <input className="form-input" value={user.section || 'A'} disabled />
+                                    </div>
+                                </div>
+                            )}
+
+                            <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={handleSaveProfile} disabled={uploading}>
+                                {uploading ? '⏳ Saving...' : '💾 Save Profile'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </aside>
     );
 }

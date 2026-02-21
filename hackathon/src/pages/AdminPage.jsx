@@ -1,13 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
     dbGetAllUsers, dbBulkImportUsers, dbDeleteFaculty, dbGetLogs,
-    dbAddFaculty, dbChangePassword,
+    dbAddFaculty, dbChangePassword, dbAllocateFaculty
 } from '../data/db';
+import { saveAs } from 'file-saver';
 
-const CSV_TEMPLATE = `name,email,role,usn,semester,password
-John Doe,john@example.com,student,1DB22BCA001,3,password123
-Jane Smith,jane@dept.edu,faculty,,,SecurePass@1`.trim();
+const CSV_TEMPLATE = `name,email,role,usn,program,section,semester,password
+John Doe,john@example.com,student,1DB22BCA001,BCA,A,3,password123
+Jane Smith,jane@dept.edu,faculty,,,,,SecurePass@1`.trim();
+
+const FACULTY_ALLOC_TEMPLATE = `email,program,section,subjects
+jane@dept.edu,BCA,A,Data Structures; Algorithms
+dr.smith@dept.edu,BCA,B,Operating Systems`.trim();
 
 export default function AdminPage() {
     const { user } = useAuth();
@@ -42,6 +47,7 @@ function UserListTab({ user: adminUser }) {
     const [showAddFaculty, setShowAddFaculty] = useState(false);
     const [toast, setToast] = useState('');
     const [changePwdUserId, setChangePwdUserId] = useState(null);
+    const [viewingUser, setViewingUser] = useState(null);
 
     const refresh = () => setUsers(dbGetAllUsers());
     const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3000); };
@@ -95,10 +101,12 @@ function UserListTab({ user: adminUser }) {
                     </thead>
                     <tbody>
                         {filtered.map(u => (
-                            <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <tr key={u.id} style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => setViewingUser(u)} className="user-row-hover">
                                 <td style={{ padding: '10px 14px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: roleColor(u.role), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.75rem', flexShrink: 0 }}>{u.avatar || u.name[0]}</div>
+                                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: roleColor(u.role), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.75rem', flexShrink: 0, overflow: 'hidden' }}>
+                                            {u.avatar && u.avatar.length > 5 ? <img src={u.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (u.avatar || u.name[0])}
+                                        </div>
                                         <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{u.name}</span>
                                     </div>
                                 </td>
@@ -109,7 +117,7 @@ function UserListTab({ user: adminUser }) {
                                 <td style={{ padding: '10px 14px', color: 'var(--text-3)' }}>
                                     {u.usn ? `${u.usn} / Sem ${u.semester}` : '—'}
                                 </td>
-                                <td style={{ padding: '10px 14px' }}>
+                                <td style={{ padding: '10px 14px' }} onClick={e => e.stopPropagation()}>
                                     {u.role !== 'admin' && (
                                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                             <button
@@ -138,7 +146,66 @@ function UserListTab({ user: adminUser }) {
                 </table>
             </div>
 
+            {viewingUser && <UserProfileModal user={viewingUser} onClose={() => setViewingUser(null)} />}
             {toast && <div className="toast toast-success">✓ {toast}</div>}
+        </div>
+    );
+}
+
+function UserProfileModal({ user, onClose }) {
+    const roleColor = (r) => r === 'admin' ? '#F472B6' : r === 'faculty' ? '#10B981' : '#60A5FA';
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 450, padding: 0, overflow: 'hidden' }}>
+                <div style={{ height: 100, background: `linear-gradient(135deg, ${roleColor(user.role)} 0%, #3B82F6 100%)`, position: 'relative' }}>
+                    <button className="modal-close" onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, color: '#fff', background: 'none' }}>✕</button>
+                </div>
+                <div style={{ padding: '0 24px 24px', position: 'relative' }}>
+                    <div style={{
+                        width: 80, height: 80, borderRadius: '50%', background: 'var(--bg-layer-2)',
+                        border: '4px solid var(--bg-surface)', marginTop: -40, marginBottom: 16,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '2rem', color: 'var(--text-1)', overflow: 'hidden'
+                    }}>
+                        {user.avatar && user.avatar.length > 5 ? (
+                            <img src={user.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (user.avatar || user.name[0])}
+                    </div>
+                    <h3 style={{ margin: 0, color: 'var(--text-1)' }}>{user.name}</h3>
+                    <p style={{ color: 'var(--text-3)', fontSize: '0.9rem', marginBottom: 16 }}>{user.email}</p>
+
+                    <div style={{ background: 'var(--bg-layer-2)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-3)', fontSize: '0.85rem' }}>Role</span>
+                            <span style={{ fontWeight: 600, color: 'var(--text-2)', textTransform: 'capitalize' }}>{user.role}</span>
+                        </div>
+                        {user.role === 'student' && (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: 'var(--text-3)', fontSize: '0.85rem' }}>USN</span>
+                                    <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>{user.usn || '—'}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: 'var(--text-3)', fontSize: '0.85rem' }}>Program</span>
+                                    <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>{user.program || 'BCA'}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: 'var(--text-3)', fontSize: '0.85rem' }}>Section</span>
+                                    <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>Section {user.section || 'A'}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: 'var(--text-3)', fontSize: '0.85rem' }}>Semester</span>
+                                    <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>Option {user.semester || '—'}</span>
+                                </div>
+                            </>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-3)', fontSize: '0.85rem' }}>Account ID</span>
+                            <span style={{ fontWeight: 600, color: 'var(--text-2)', fontFamily: 'monospace', fontSize: '0.75rem' }}>{user.id}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
@@ -229,19 +296,17 @@ function AddFacultyForm({ onAdded, onCancel }) {
 // ─── Bulk Import ──────────────────────────────────────────────────────────
 
 function BulkImportTab({ user }) {
+    const [importType, setImportType] = useState('users'); // 'users' or 'faculty'
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
     const [processing, setProcessing] = useState(false);
     const fileRef = useRef();
 
     const downloadTemplate = () => {
-        const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'acportal_import_template.csv';
-        a.click();
-        URL.revokeObjectURL(url);
+        const text = importType === 'users' ? CSV_TEMPLATE : FACULTY_ALLOC_TEMPLATE;
+        const filename = importType === 'users' ? 'acportal_users_template.csv' : 'acportal_faculty_alloc_template.csv';
+        const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+        saveAs(blob, filename);
     };
 
     const parseCSV = (text) => {
@@ -264,8 +329,14 @@ function BulkImportTab({ user }) {
             const text = await file.text();
             const rows = parseCSV(text);
             if (rows.length === 0) { setError('No data rows found in the CSV.'); setProcessing(false); return; }
-            const res = dbBulkImportUsers(rows, user);
-            setResult(res);
+
+            if (importType === 'users') {
+                const res = dbBulkImportUsers(rows, user);
+                setResult(res);
+            } else {
+                const res = dbAllocateFaculty(rows, user);
+                setResult(res);
+            }
         } catch (err) {
             setError('Failed to parse the CSV file. Please use the template format.');
         }
@@ -275,16 +346,24 @@ function BulkImportTab({ user }) {
 
     return (
         <div style={{ maxWidth: 720 }}>
+            <div className="role-tabs" style={{ marginBottom: 20, width: 'fit-content' }}>
+                <button type="button" className={`role-tab ${importType === 'users' ? 'active' : ''}`} onClick={() => { setImportType('users'); setResult(null); setError(''); }}>Users Setup</button>
+                <button type="button" className={`role-tab ${importType === 'faculty' ? 'active' : ''}`} onClick={() => { setImportType('faculty'); setResult(null); setError(''); }}>Faculty Appoints</button>
+            </div>
+
             <div className="glass-card anim-up" style={{ padding: 28, marginBottom: 24 }}>
-                <h3 style={{ marginBottom: 16, fontFamily: "'Space Grotesk', sans-serif" }}>📥 Bulk Import Users</h3>
+                <h3 style={{ marginBottom: 16, fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {importType === 'users' ? '📥 Bulk Import Users' : '📥 Faculty Class Allocations'}
+                </h3>
                 <p style={{ color: 'var(--text-2)', marginBottom: 24, fontSize: '0.87rem', lineHeight: 1.7 }}>
-                    Download the CSV template, fill it with student and faculty details, then upload it here.
-                    Duplicate emails are automatically skipped. All fields except <code style={{ color: 'var(--primary)' }}>usn</code> and <code style={{ color: 'var(--primary)' }}>semester</code> (for faculty) are required.
+                    {importType === 'users'
+                        ? 'Download the CSV template, fill it with student/faculty details, then upload it here. Duplicate emails are skipped. Name, email, role, and password are required.'
+                        : 'Allocate subjects to faculty for specific programs and sections. Separate multiple subjects with a semicolon (;). Email must match an existing faculty user.'}
                 </p>
 
                 <div style={{ background: 'var(--bg-surface)', borderRadius: 10, padding: '16px 20px', marginBottom: 24, fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-2)', lineHeight: 1.8, overflowX: 'auto' }}>
                     <div style={{ color: 'var(--text-3)', marginBottom: 4, fontFamily: 'inherit', fontWeight: 700 }}>CSV Format:</div>
-                    {CSV_TEMPLATE.split('\n').map((l, i) => <div key={i}>{l}</div>)}
+                    {(importType === 'users' ? CSV_TEMPLATE : FACULTY_ALLOC_TEMPLATE).split('\n').map((l, i) => <div key={i}>{l}</div>)}
                 </div>
 
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
@@ -300,7 +379,7 @@ function BulkImportTab({ user }) {
 
             {error && <div className="alert alert-error">⚠️ {error}</div>}
 
-            {result && (
+            {result && importType === 'users' && (
                 <div className="glass-card anim-up" style={{ padding: 24 }}>
                     <h4 style={{ marginBottom: 16, color: 'var(--text-1)' }}>✅ Import Complete</h4>
                     <div className="g-3" style={{ gap: 12, marginBottom: result.errors?.length ? 16 : 0 }}>
@@ -311,6 +390,30 @@ function BulkImportTab({ user }) {
                         <div style={{ padding: '14px 20px', borderRadius: 10, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', textAlign: 'center' }}>
                             <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#F59E0B' }}>{result.skipped}</div>
                             <div style={{ fontSize: '0.78rem', color: 'var(--text-3)', marginTop: 4 }}>Skipped (duplicate)</div>
+                        </div>
+                    </div>
+                    {result.errors?.length > 0 && (
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.83rem', color: 'var(--danger)', marginBottom: 8 }}>Errors:</div>
+                            {result.errors.map((e, i) => (
+                                <div key={i} style={{ fontSize: '0.8rem', color: 'var(--text-2)', padding: '4px 0' }}>• {e}</div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {result && importType === 'faculty' && (
+                <div className="glass-card anim-up" style={{ padding: 24 }}>
+                    <h4 style={{ marginBottom: 16, color: 'var(--text-1)' }}>✅ Allocations Updated</h4>
+                    <div className="g-3" style={{ gap: 12, marginBottom: result.errors?.length ? 16 : 0 }}>
+                        <div style={{ padding: '14px 20px', borderRadius: 10, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', textAlign: 'center' }}>
+                            <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#10B981' }}>{result.updated}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-3)', marginTop: 4 }}>Staff Allocated</div>
+                        </div>
+                        <div style={{ padding: '14px 20px', borderRadius: 10, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', textAlign: 'center' }}>
+                            <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#F59E0B' }}>{result.notFound}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-3)', marginTop: 4 }}>Not Found</div>
                         </div>
                     </div>
                     {result.errors?.length > 0 && (

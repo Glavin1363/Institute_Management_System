@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbGetAttendance, dbSaveAttendance } from '../data/db';
 
@@ -12,6 +12,11 @@ export default function AttendancePage() {
     const [loading, setLoading] = useState(false);
     const fileInputRef = useRef(null);
 
+    // Filters for Faculty logic
+    const [program, setProgram] = useState('BCA');
+    const [section, setSection] = useState('A');
+    const [subject, setSubject] = useState('BCA401');
+
     const showToast = (msg, isError = false) => {
         if (isError) {
             setToastError(msg);
@@ -24,26 +29,28 @@ export default function AttendancePage() {
 
     const downloadTemplate = () => {
         const allUsers = JSON.parse(localStorage.getItem('acportal_users') || '[]');
-        const students = allUsers.filter(u => u.role === 'student');
+        const students = allUsers.filter(u => u.role === 'student' && u.program === program && u.section === section);
 
         let csv = "USN,Name,Date,Course,Status\n";
         const today = new Date().toISOString().slice(0, 10);
 
-        // Provide 1 blank row or pre-fill with existing students so teacher can just edit "Status".
         if (students.length > 0) {
             students.forEach(s => {
-                csv += `${s.usn || ''},${s.name},${today},BCA401,Present\n`;
+                csv += `${s.usn || ''},${s.name},${today},${subject},Present\n`;
             });
         } else {
-            csv += `USN001,John Doe,${today},BCA401,Present\n`;
+            csv += `USN001,John Doe,${today},${subject},Present\n`;
         }
 
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Attendance_Template_${today}.csv`;
+        a.download = `Attendance_Template_${program}_${section}_${subject}_${today}.csv`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     const handleFileUpload = (e) => {
@@ -155,13 +162,40 @@ export default function AttendancePage() {
                 {isStaff ? (
                     // FACULTY VIEW
                     <div className="glass-card" style={{ padding: 24, border: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+                            <div className="form-group" style={{ flex: 1, minWidth: 150 }}>
+                                <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-3)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Program</label>
+                                <select className="form-select" value={program} onChange={e => setProgram(e.target.value)}>
+                                    <option value="BCA">BCA</option>
+                                    <option value="BBA">BBA</option>
+                                    <option value="B.COM">B.COM</option>
+                                </select>
+                            </div>
+                            <div className="form-group" style={{ flex: 1, minWidth: 150 }}>
+                                <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-3)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Section / Class</label>
+                                <select className="form-select" value={section} onChange={e => setSection(e.target.value)}>
+                                    <option value="A">Section A</option>
+                                    <option value="B">Section B</option>
+                                    <option value="C">Section C</option>
+                                </select>
+                            </div>
+                            <div className="form-group" style={{ flex: 1, minWidth: 150 }}>
+                                <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-3)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Subject</label>
+                                <select className="form-select" value={subject} onChange={e => setSubject(e.target.value)}>
+                                    <option value="BCA401">BCA401</option>
+                                    <option value="BCA402">BCA402</option>
+                                    <option value="BCA403">BCA403</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 24, padding: 24, background: 'rgba(99,102,241,0.05)', borderRadius: 12, border: '1px dashed rgba(99,102,241,0.3)' }}>
                             <div style={{ flex: 1, minWidth: 280 }}>
                                 <div style={{ width: 40, height: 40, background: 'rgba(124, 58, 237, 0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', marginBottom: 12 }}>📥</div>
                                 <h3 style={{ margin: '0 0 8px 0', fontSize: '1.05rem', color: 'var(--text-1)' }}>1. Download Template</h3>
-                                <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: 'var(--text-3)', lineHeight: 1.5 }}>Get a pre-filled matching template holding columns for USN, Name, Date, Course, and Status.</p>
+                                <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: 'var(--text-3)', lineHeight: 1.5 }}>Get a pre-filled template carrying the enrolled students of {program} Section {section}.</p>
                                 <button className="btn btn-outline" onClick={downloadTemplate}>
-                                    📄 Download CSV Template
+                                    📄 Download Excel (.csv) Template
                                 </button>
                             </div>
 
@@ -170,16 +204,16 @@ export default function AttendancePage() {
                             <div style={{ flex: 1, minWidth: 280 }}>
                                 <div style={{ width: 40, height: 40, background: 'rgba(16, 185, 129, 0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', marginBottom: 12 }}>📤</div>
                                 <h3 style={{ margin: '0 0 8px 0', fontSize: '1.05rem', color: 'var(--text-1)' }}>2. Upload Records</h3>
-                                <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: 'var(--text-3)', lineHeight: 1.5 }}>Upload the edited .csv file here. We will parse it and show a preview before you publish it.</p>
+                                <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: 'var(--text-3)', lineHeight: 1.5 }}>Upload the edited Excel file here. We will verify records before you publish them.</p>
                                 <input
                                     type="file"
-                                    accept=".csv"
+                                    accept=".csv, application/vnd.ms-excel"
                                     ref={fileInputRef}
                                     onChange={handleFileUpload}
                                     style={{ display: 'none' }}
                                 />
                                 <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>
-                                    ⬆️ Select & Parse CSV
+                                    ⬆️ Select Excel (.csv) File
                                 </button>
                             </div>
                         </div>

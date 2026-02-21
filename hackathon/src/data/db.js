@@ -178,10 +178,21 @@ const seedData = () => {
       password: 'Admin@861',
       usn: null,
       semester: null,
+      program: null,
+      section: null,
       avatar: 'HA',
     });
     localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
   }
+  let migratedUsers = false;
+  users.forEach(u => {
+    if (u.role === 'student' && !u.program) {
+      u.program = 'BCA';
+      u.section = 'A';
+      migratedUsers = true;
+    }
+  });
+  if (migratedUsers) localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
   if (!localStorage.getItem(DB_KEYS.FILES)) localStorage.setItem(DB_KEYS.FILES, JSON.stringify([]));
   if (!localStorage.getItem(DB_KEYS.NOTICES)) localStorage.setItem(DB_KEYS.NOTICES, JSON.stringify([]));
   if (!localStorage.getItem(DB_KEYS.CLASSROOMS)) localStorage.setItem(DB_KEYS.CLASSROOMS, JSON.stringify([]));
@@ -228,6 +239,8 @@ export const dbGoogleAuth = (email, name) => {
       password: null,
       usn: `G-${Math.floor(Math.random() * 90000) + 10000}`,
       semester: '1',
+      program: 'BCA',
+      section: 'A',
       avatar: name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
     };
     users.push(user);
@@ -272,7 +285,23 @@ export const dbDeleteFaculty = (facultyId) => {
   return true;
 };
 
-export const dbRegisterStudent = (usn, name, semester, password, email) => {
+export const dbUpdateUser = (userId, updates) => {
+  const users = JSON.parse(localStorage.getItem(DB_KEYS.USERS) || '[]');
+  const idx = users.findIndex(u => u.id === userId);
+  if (idx !== -1) {
+    users[idx] = { ...users[idx], ...updates };
+    localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
+
+    const curUser = JSON.parse(localStorage.getItem(DB_KEYS.CURRENT_USER) || '{}');
+    if (curUser.id === userId) {
+      localStorage.setItem(DB_KEYS.CURRENT_USER, JSON.stringify({ ...curUser, ...updates }));
+    }
+    return { success: true, user: { ...users[idx] } };
+  }
+  return { success: false, error: 'User not found' };
+};
+
+export const dbRegisterStudent = (usn, name, semester, program, section, password, email) => {
   const users = JSON.parse(localStorage.getItem(DB_KEYS.USERS) || '[]');
   const existing = users.find((u) => u.usn === usn.toUpperCase());
   if (existing) return { success: false, error: `USN ${usn.toUpperCase()} already registered.` };
@@ -286,6 +315,8 @@ export const dbRegisterStudent = (usn, name, semester, password, email) => {
     password,
     usn: usn.toUpperCase(),
     semester,
+    program,
+    section,
     avatar: name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
   };
   users.push(newUser);
@@ -314,7 +345,7 @@ export const dbBulkImportUsers = (rows, adminUser) => {
   const users = JSON.parse(localStorage.getItem(DB_KEYS.USERS) || '[]');
   const results = { created: 0, skipped: 0, errors: [] };
   rows.forEach((row, idx) => {
-    const { name, email, role, usn, semester, password } = row;
+    const { name, email, role, usn, program, section, semester, password } = row;
     if (!name || !email || !role || !password) {
       results.errors.push(`Row ${idx + 2}: Missing required fields`);
       return;
@@ -332,6 +363,8 @@ export const dbBulkImportUsers = (rows, adminUser) => {
       password: password.trim(),
       usn: usn ? usn.toUpperCase() : null,
       semester: semester || null,
+      program: program ? program.toUpperCase() : (role.toLowerCase() === 'student' ? 'BCA' : null),
+      section: section ? section.toUpperCase() : (role.toLowerCase() === 'student' ? 'A' : null),
       avatar: name.trim().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
     };
     users.push(newUser);
@@ -339,6 +372,34 @@ export const dbBulkImportUsers = (rows, adminUser) => {
   });
   localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
   dbLog('BULK_IMPORT', adminUser, `Imported ${results.created} users, skipped ${results.skipped}`);
+  return results;
+};
+
+export const dbAllocateFaculty = (rows, adminUser) => {
+  const users = JSON.parse(localStorage.getItem(DB_KEYS.USERS) || '[]');
+  const results = { updated: 0, notFound: 0, errors: [] };
+  rows.forEach((row, idx) => {
+    const { email, program, section, subjects } = row;
+    if (!email || !program || !section || !subjects) {
+      results.errors.push(`Row ${idx + 2}: Missing required fields (email, program, section, subjects)`);
+      return;
+    }
+    const userIdx = users.findIndex(u => u.email === email.trim().toLowerCase() && u.role === 'faculty');
+    if (userIdx !== -1) {
+      const u = users[userIdx];
+      u.allocations = u.allocations || [];
+      u.allocations.push({
+        program: program.toUpperCase(),
+        section: section.toUpperCase(),
+        subjects: subjects.split(';').map(s => s.trim()).filter(Boolean)
+      });
+      results.updated++;
+    } else {
+      results.notFound++;
+    }
+  });
+  localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
+  dbLog('FACULTY_ALLOCATION', adminUser, `Allocated classes for ${results.updated} faculty.`);
   return results;
 };
 
@@ -400,6 +461,13 @@ export const dbRejectFile = (fileId, user) => {
   const files = JSON.parse(localStorage.getItem(DB_KEYS.FILES) || '[]');
   localStorage.setItem(DB_KEYS.FILES, JSON.stringify(files.filter((f) => f.id !== fileId)));
   dbLog('REJECT_FILE', user, `Rejected file ${fileId}`);
+  return true;
+};
+
+export const dbDeleteFile = (fileId, user) => {
+  const files = JSON.parse(localStorage.getItem(DB_KEYS.FILES) || '[]');
+  localStorage.setItem(DB_KEYS.FILES, JSON.stringify(files.filter((f) => f.id !== fileId)));
+  dbLog('DELETE_FILE', user, `Deleted file ${fileId}`);
   return true;
 };
 
@@ -820,8 +888,29 @@ export const dbSaveAttendance = (records, user) => {
 // ---- TIMETABLE ----
 export const dbGetTimetable = (filters = {}) => {
   let records = JSON.parse(localStorage.getItem(DB_KEYS.TIMETABLE) || '[]');
+  if (filters.courseId) records = records.filter(r => r.courseId === filters.courseId);
   if (filters.teacherId) records = records.filter(r => r.teacherId === filters.teacherId);
   return records;
+};
+
+export const dbSaveTimetable = (courseId, newRecords, user) => {
+  const all = JSON.parse(localStorage.getItem(DB_KEYS.TIMETABLE) || '[]');
+  // Remove all existing records for this specific class group
+  const filtered = all.filter(r => r.courseId !== courseId);
+
+  // newRecords is an array of period objects { dayOfWeek, startTime, endTime, sub, name, room, teacher }
+  const toInsert = newRecords.map(r => ({
+    id: `tt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    courseId, // E.g., "BCA-A"
+    ...r,
+    createdBy: user.id,
+    createdAt: new Date().toISOString()
+  }));
+
+  filtered.push(...toInsert);
+  localStorage.setItem(DB_KEYS.TIMETABLE, JSON.stringify(filtered));
+  dbLog('UPDATE_TIMETABLE', user, `Updated schedule for ${courseId}`);
+  return true;
 };
 
 // ---- RESULTS ----
